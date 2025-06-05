@@ -1,0 +1,152 @@
+library(shiny)
+library(shinydashboard)
+library(ggplot2)
+library(gapminder)
+library(dplyr)
+library(plotly)
+install.packages("shinydashboard")
+
+ui <- dashboardPage(
+  dashboardHeader(title = "Dashboard Gapminder"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Esquema 1", tabName = "esquema1", icon = icon("chart-line")),
+      menuItem("Esquema 2", tabName = "esquema2", icon = icon("chart-bar")),
+      menuItem("Esquema 3", tabName = "esquema3", icon = icon("chart-area")),
+      menuItem("Esquema 4", tabName = "esquema4", icon = icon("globe")),
+      menuItem("Esquema 5", tabName = "esquema5", icon = icon("globe"))
+    ),
+    selectInput("continente", "Selecciona Continente:", 
+                choices = c("Todos", levels(gapminder$continent))),  # Usamos levels() para factores
+    selectInput("pais", "Selecciona Pais:", 
+                choices = c("Todos", levels(gapminder$country))),  # Usamos levels() para factores
+    sliderInput("anio", "Selecciona Año:", 
+                min = min(gapminder$year), max = max(gapminder$year), 
+                value = 2007, step = 5)
+  ),
+  dashboardBody(
+    tabItems(
+      tabItem(tabName = "esquema1",
+              fluidRow(
+                box(title = "Esperanza de Vida vs PIB per cápita", width = 12, 
+                    plotlyOutput("plot1"))
+              )),
+      tabItem(tabName = "esquema2",
+              fluidRow(
+                box(title = "Top 10 PIB per cápita", width = 12, 
+                    plotlyOutput("plot2"))
+              )),
+      tabItem(tabName = "esquema3",
+              fluidRow(
+                box(title = "Relación Población vs Esperanza de vida", width = 12, 
+                    plotlyOutput("plot3"))
+              )),
+      tabItem(tabName = "esquema4",
+              fluidRow(
+                box(title = "Animación: PIB vs Esperanza de Vida", width = 12, 
+                    plotlyOutput("plot4"))
+                
+              )),
+      tabItem(tabName = "esquema5",
+              fluidRow(
+                box(title = "Animación: PIB vs Esperanza de Vida", width = 12, 
+                    plotlyOutput("plot5"))
+                
+              ))
+    )
+  )
+)
+
+server <- function(input, output) {
+  datos_filtrados <- reactive({
+    data <- gapminder %>% filter(year == input$anio)
+    
+    if (input$continente != "Todos") {
+      data <- data %>% filter(continent == input$continente)
+    }
+    
+    if (input$pais != "Todos") {
+      data <- data %>% filter(country == input$pais)
+    }
+    
+    return(data)
+  })
+  
+  datos_animacion <- reactive({
+  data <- gapminder
+  
+  if (input$continente != "Todos") {
+    data <- data %>% filter(continent == input$continente)
+  }
+  
+  if (input$pais != "Todos") {
+    data <- data %>% filter(country == input$pais)
+  }
+  
+  return(data)
+})
+  
+  output$plot1 <- renderPlotly({
+    ggplotly(
+      ggplot(datos_filtrados(), aes(x = gdpPercap, y = lifeExp, color = country)) +
+        geom_point(size = 3) +
+        scale_x_log10() +
+        theme_minimal() +
+        labs(title = "Esperanza de Vida(años) vs PIB per cápita", 
+             x = "PIB per cápita ", y = "Esperanza de Vida")
+    )
+  })
+  
+  output$plot2 <- renderPlotly({
+    top10 <- datos_filtrados() %>%
+      arrange(desc(gdpPercap)) %>%
+      head(10)
+    
+    ggplotly(
+      ggplot(top10, aes(x = reorder(country, gdpPercap), y = gdpPercap, fill = country)) +
+        geom_bar(stat = "identity") +
+        coord_flip() +
+        theme_minimal() +
+        labs(title = "Top 10 países por PIB per cápita", 
+             x = "País", y = "PIB per cápita")
+    )
+  })
+  
+  output$plot3 <- renderPlotly({
+    ggplotly(
+      ggplot(datos_filtrados(), aes(x = pop, y = lifeExp, color = country)) +
+        geom_point(size = 3) +
+        scale_x_log10(labels = scales::label_number(accuracy = 1)) +
+        theme_minimal() +
+        labs(title = "Población vs Esperanza de Vida", 
+             x = "Población ", y = "Esperanza de Vida")
+    )
+  })
+  
+  output$plot4 <- renderPlotly({
+    ggplotly(
+      ggplot(datos_animacion(), aes(x = gdpPercap, y = lifeExp, size = pop, color = continent,
+                                    frame = year, text = country)) +
+        geom_point(alpha = 0.7) +
+        scale_x_log10(labels = scales::label_number(accuracy = 1)) +
+        theme_minimal() +
+        labs(title = "Animación Esperanza de Vida", 
+             x = "PIB per cápita ", y = "Esperanza de Vida")
+    ) %>% animation_opts(1000)
+  })
+  
+  
+  #######
+  output$plot5 <- renderPlotly({
+    ggplotly(
+      ggplot(datos_animacion(), aes(x = year, y = lifeExp, size = pop, color = continent,
+                                    frame = year, text = country, group = country)) +
+        geom_point(alpha = 0.7) +
+        theme_minimal() +
+        labs(title = "Animación: Esperanza de Vida a través del tiempo", 
+             x = "Año", y = "Esperanza de Vida")
+    ) %>% animation_opts(1000)
+  })
+}
+
+shinyApp(ui, server)
