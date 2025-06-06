@@ -1,4 +1,12 @@
 Presentación del Dashboard Interactivo - Gapminder
+
+Este es un trabajo del curso de Herramientas Informáticas I, consiste en la elaboración de un dashboard interactivo 
+utilizando el software R y la base de datos de Gapminder, la cual ofrece datos sobre el desarrollo humano, incluyendo 
+indicadores como la expectativa de vida, el PIB per cápita y la tasa de fertilidad de diferentes países a lo largo del 
+tiempo. El proyecto se almacenó en GitHub y se publicó en shinyapps.io.
+
+![image](https://github.com/user-attachments/assets/562b6484-0dd9-493a-a5ec-7241b46589e8)
+
 1. Introducción
 Objetivo: Desarrollar un dashboard interactivo que permita explorar datos de desarrollo global utilizando la base de datos Gapminder.
 Herramientas Utilizadas: R, Shiny, ggplot2, plotly, dplyr, entre otros.
@@ -32,3 +40,14 @@ Animaciones que muestran el desarrollo económico a través del tiempo.
 Se ejecuta la aplicación Shiny con la función shinyApp(ui, server).
 7. Conclusiones
 El dashboard permite una exploración interactiva de los datos de Gapminder, facilitando la visualización de tendencias y comparaciones entre países y continentes.
+
+COMPARTIMOS NUESTROS RESULTADOS EN LOS SIGUIENTES LINKS.
+Subidos en la aplicacion Shiny.io
+
+https://joe7gu.shinyapps.io/PACCONTINENTAL/
+
+
+https://centeno-diaz-cl.shinyapps.io/app_maestria_luiggi/
+
+
+https://frank1400113.shinyapps.io/frank/
