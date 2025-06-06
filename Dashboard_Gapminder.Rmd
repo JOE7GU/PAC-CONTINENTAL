@@ -1,0 +1,110 @@
+
+---
+title: "Dashboard Interactivo Gapminder"
+author: "Universidad Continental - Maestría en Economía"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# PRODUCTO ACADÉMICO COLABORATIVO
+## Creación de un Dashboard Interactivo
+**Curso**: Herramientas Informáticas I  
+**Profesor**: Joel Turco Quinto  
+**Tema**: Dashboard Gapminder  
+**Integrantes**:  
+- CASTRO GUERRERO, Joel Michael  
+- CENTENO DIAZ, Cesar Luiggi  
+- CHOQUE LUZA, Fernando Ivan  
+- JAMES  
+- COLLANTES SANCHEZ, Frank  
+
+```{r limpiar-entorno}
+rm(list = ls())
+```
+
+## 1. Instalar y cargar paquetes
+
+```{r paquetes}
+# install.packages(...) (descomente si necesita instalar)
+library(shiny)
+library(shinydashboard)
+library(ggplot2)
+library(gapminder)
+library(dplyr)
+library(plotly)
+library(DT)
+library(maps)
+library(viridis)
+library(stringr)
+```
+
+## 2. Preparación de datos
+
+```{r datos}
+DATA_PAC <- gapminder %>% 
+  mutate(country = as.character(country), continent = as.character(continent)) %>% 
+  rename(
+    País = country, Continente = continent, Año = year, 
+    Esperanza_de_vida = lifeExp, Población = pop, PIB_per_cápita = gdpPercap
+  ) %>% 
+  mutate(
+    Continente = case_when(
+      Continente == "Africa" ~ "África",
+      Continente == "Americas" ~ "América",
+      Continente == "Asia" ~ "Asia",
+      Continente == "Europe" ~ "Europa",
+      Continente == "Oceania" ~ "Oceanía",
+      TRUE ~ Continente
+    ),
+    PIB_total = PIB_per_cápita * Población
+  )
+
+world_map <- map_data("world") %>% 
+  mutate(region = str_replace_all(region, c(
+    "USA" = "United States",
+    "UK" = "United Kingdom",
+    "Democratic Republic of the Congo" = "Congo, Dem. Rep.",
+    "Republic of Congo" = "Congo, Rep."
+  )))
+```
+
+## 3. Aplicación Shiny
+
+```{r shiny-app, eval=FALSE}
+ui <- dashboardPage(
+  dashboardHeader(title = "Dashboard Gapminder - UC"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Relaciones Principales", tabName = "relaciones", icon = icon("chart-line")),
+      menuItem("Ranking de Países", tabName = "ranking", icon = icon("trophy")),
+      menuItem("Evolución Temporal", tabName = "evolucion", icon = icon("chart-area")),
+      menuItem("Comparación", tabName = "comparacion", icon = icon("globe-americas")),
+      menuItem("Mapa Mundial", tabName = "mapa", icon = icon("map"))
+    ),
+    selectInput("continente", "Selecciona Continente:", choices = c("Todos", unique(DATA_PAC$Continente))),
+    uiOutput("selector_pais"),
+    sliderInput("anio", "Selecciona Año:", min = min(DATA_PAC$Año), max = max(DATA_PAC$Año), value = 2007, step = 5, sep = ""),
+    numericInput("top_n", "Número de países en ranking:", value = 10, min = 1, max = 20)
+  ),
+  dashboardBody(
+    tabItems(
+      tabItem(tabName = "relaciones", ...),
+      tabItem(tabName = "ranking", ...),
+      tabItem(tabName = "evolucion", ...),
+      tabItem(tabName = "comparacion", ...),
+      tabItem(tabName = "mapa", ...)
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  # Código del servidor (idéntico al entregado previamente)
+}
+
+shinyApp(ui, server)
+```
+
+**Nota**: Para ejecutar la aplicación, copie y pegue el bloque `ui`, `server` y `shinyApp` en un script `.R` o utilice `runApp()`.

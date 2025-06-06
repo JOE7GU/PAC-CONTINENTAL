@@ -1,0 +1,420 @@
+#################################################
+###### Universidad Continental ##################
+###### Maestría en Economía #####################
+# =============================================
+#######PRODUCTO ACADÉMICO COLABORATIVO###########
+######CREACIÓN DE UN DASHBOARD INTERACTIVO#######
+#****** Curso : Herramientas Informáticas I
+#****** Prof. : Joel Turco Quinto
+#****** Tema  : Dashboard Gapminder
+#*Integrantes : -CASTRO GUERRERO, Joel Michael
+#************ : -CENTENO DIAZ, Cesar Luiggi
+#************ : -CHOQUE LUZA, Fernando Ivan
+#************ : -YONG GARCIA, James Alexander
+#************ : -COLLANTES SANCHEZ, Frank
+# =============================================
+
+## Limpiar el entorno de trabajo
+rm(list = ls())
+
+# 1. INSTALAR Y CARGAR PAQUETES ----------------------------
+install.packages("shiny")
+install.packages("shinydashboard")
+install.packages("ggplot2")
+install.packages("gapminder")
+install.packages("dplyr")
+install.packages("plotly")
+install.packages("DT")
+install.packages("maps")
+install.packages("viridis")
+install.packages("stringr")
+
+library(shiny)
+library(shinydashboard)
+library(ggplot2)
+library(gapminder)
+library(dplyr)
+library(plotly)
+library(DT)
+library(maps)
+library(viridis)
+library(stringr)
+
+# 2. PREPARACIÓN DE DATOS ----------------------------------
+# Datos Gapminder
+DATA_PAC <- gapminder %>%
+  mutate(
+    country = as.character(country),
+    continent = as.character(continent)
+  ) %>% 
+  rename(
+    País = country,
+    Continente = continent,
+    Año = year,
+    Esperanza_de_vida = lifeExp,
+    Población = pop,
+    PIB_per_cápita = gdpPercap
+  ) %>%
+  mutate(
+    Continente = case_when(
+      Continente == "Africa" ~ "África",
+      Continente == "Americas" ~ "América",
+      Continente == "Asia" ~ "Asia",
+      Continente == "Europe" ~ "Europa",
+      Continente == "Oceania" ~ "Oceanía",
+      TRUE ~ Continente
+    ),
+    PIB_total = PIB_per_cápita * Población
+  )
+
+# Datos para el mapa mundial
+world_map <- map_data("world") %>%
+  mutate(region = str_replace_all(region, c(
+    "USA" = "United States",
+    "UK" = "United Kingdom",
+    "Democratic Republic of the Congo" = "Congo, Dem. Rep.",
+    "Republic of Congo" = "Congo, Rep."
+  )))
+
+# 3. INTERFAZ DE USUARIO -----------------------------------
+ui <- dashboardPage(
+  dashboardHeader(title = "Dashboard Gapminder - UC"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Relaciones Principales", tabName = "relaciones", icon = icon("chart-line")),
+      menuItem("Ranking de Países", tabName = "ranking", icon = icon("trophy")),
+      menuItem("Evolución Temporal", tabName = "evolucion", icon = icon("chart-area")),
+      menuItem("Comparación", tabName = "comparacion", icon = icon("globe-americas")),
+      menuItem("Mapa Mundial", tabName = "mapa", icon = icon("map"))
+    ),
+    selectInput("continente", "Selecciona Continente:", 
+                choices = c("Todos", unique(DATA_PAC$Continente))),
+    uiOutput("selector_pais"),
+    sliderInput("anio", "Selecciona Año:", 
+                min = min(DATA_PAC$Año), max = max(DATA_PAC$Año), 
+                value = 2007, step = 5, sep = ""),
+    numericInput("top_n", "Número de países en ranking:", 
+                 value = 10, min = 1, max = 20)
+  ),
+  dashboardBody(
+    tabItems(
+      # Pestaña 1: Relaciones Principales
+      tabItem(tabName = "relaciones",
+              fluidRow(
+                box(plotlyOutput("plot_relacion"), width = 6),
+                box(plotlyOutput("plot_poblacion"), width = 6)
+              ),
+              fluidRow(
+                box(DTOutput("tabla_resumen"), width = 12)
+              )
+      ),
+      
+      # Pestaña 2: Ranking de Países
+      tabItem(tabName = "ranking",
+              fluidRow(
+                box(plotlyOutput("plot_ranking_gdp"), width = 6),
+                box(plotlyOutput("plot_ranking_life"), width = 6)
+              )
+      ),
+      
+      # Pestaña 3: Evolución Temporal
+      tabItem(tabName = "evolucion",
+              fluidRow(
+                box(plotlyOutput("plot_evolucion_gdp"), width = 12)
+              ),
+              fluidRow(
+                box(plotlyOutput("plot_evolucion_life"), width = 12)
+              )
+      ),
+      
+      # Pestaña 4: Comparación
+      tabItem(tabName = "comparacion",
+              fluidRow(
+                box(plotlyOutput("plot_comparacion"), width = 12)
+              ),
+              fluidRow(
+                box(plotlyOutput("plot_animacion"), width = 12)
+              )
+      ),
+      
+      # Pestaña 5: Mapa Mundial (NUEVA PESTAÑA)
+      tabItem(tabName = "mapa",
+              fluidRow(
+                box(title = "Mapa Mundial de Esperanza de Vida",
+                    plotOutput("mapa_mundial"), width = 12,
+                    footer = "Seleccione el año usando el control deslizante en el panel lateral")
+              )
+      )
+    )
+  )
+)
+
+# 4. SERVIDOR ----------------------------------------------
+server <- function(input, output, session) {
+  
+  # Selector dinámico de países
+  output$selector_pais <- renderUI({
+    paises_disponibles <- DATA_PAC
+    
+    if(input$continente != "Todos") {
+      paises_disponibles <- paises_disponibles %>% 
+        filter(Continente == input$continente)
+    }
+    
+    selectInput("pais", "Selecciona País:", 
+                choices = c("Todos", unique(paises_disponibles$País)))
+  })
+  
+  # Datos filtrados reactivos
+  datos_filtrados <- reactive({
+    datos <- DATA_PAC %>% 
+      filter(Año == input$anio)
+    
+    if(input$continente != "Todos") {
+      datos <- datos %>% filter(Continente == input$continente)
+    }
+    
+    if(!is.null(input$pais) && input$pais != "Todos") {
+      datos <- datos %>% filter(País == input$pais)
+    }
+    
+    return(datos)
+  })
+  
+  # Datos para evolución temporal
+  datos_evolucion <- reactive({
+    datos <- DATA_PAC
+    
+    if(input$continente != "Todos") {
+      datos <- datos %>% filter(Continente == input$continente)
+    }
+    
+    if(!is.null(input$pais) && input$pais != "Todos") {
+      datos <- datos %>% filter(País == input$pais)
+    }
+    
+    return(datos)
+  })
+  
+  # Datos para el mapa mundial (REACTIVO)
+  datos_mapa <- reactive({
+    gapminder_anio <- DATA_PAC %>%
+      filter(Año == input$anio) %>%
+      mutate(
+        País = case_when(
+          País == "Congo, Dem. Rep." ~ "Democratic Republic of the Congo",
+          País == "Congo, Rep." ~ "Republic of Congo",
+          TRUE ~ País
+        )
+      )
+    
+    world_map %>%
+      left_join(gapminder_anio, by = c("region" = "País"))
+  })
+  
+  # Gráfico: Mapa Mundial (NUEVO OUTPUT)
+  output$mapa_mundial <- renderPlot({
+    datos <- datos_mapa()
+    
+    ggplot(datos, aes(x = long, y = lat, group = group, fill = Esperanza_de_vida)) +
+      geom_polygon(color = "white", size = 0.1) +
+      scale_fill_viridis(
+        option = "C", 
+        na.value = "grey80",
+        name = "Esperanza de Vida",
+        limits = c(30, 85)  # Rango fijo para mejor comparación entre años
+      ) +
+      labs(
+        title = paste("Esperanza de Vida por País (", input$anio, ")"),
+        caption = "Fuente: Gapminder"
+      ) +
+      theme_void() +
+      theme(
+        plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+        legend.position = "bottom",
+        legend.key.width = unit(2, "cm")
+      )
+  })
+  
+  # Gráfico: Relación PIB vs Esperanza de vida
+  output$plot_relacion <- renderPlotly({
+    validate(
+      need(nrow(datos_filtrados()) > 0, "No hay datos disponibles con los filtros seleccionados")
+    )
+    
+    ggplotly(
+      ggplot(datos_filtrados(), aes(x = PIB_per_cápita, y = Esperanza_de_vida, 
+                                    color = Continente, size = Población, text = País)) +
+        geom_point(alpha = 0.7) +
+        scale_x_log10(labels = scales::dollar) +
+        labs(title = "Relación entre PIB y Esperanza de Vida",
+             x = "PIB per cápita (escala log)", 
+             y = "Esperanza de Vida (años)") +
+        theme_minimal() +
+        theme(legend.position = "none"),
+      tooltip = c("text", "x", "y")
+    )
+  })
+  
+  # Gráfico: Relación Población vs Esperanza de vida
+  output$plot_poblacion <- renderPlotly({
+    validate(
+      need(nrow(datos_filtrados()) > 0, "No hay datos disponibles con los filtros seleccionados")
+    )
+    
+    ggplotly(
+      ggplot(datos_filtrados(), aes(x = Población, y = Esperanza_de_vida, 
+                                    color = Continente, text = País)) +
+        geom_point(alpha = 0.7) +
+        scale_x_log10(labels = scales::comma) +
+        labs(title = "Relación entre Población y Esperanza de Vida",
+             x = "Población (escala log)", 
+             y = "Esperanza de Vida (años)") +
+        theme_minimal(),
+      tooltip = c("text", "x", "y")
+    )
+  })
+  
+  # Tabla resumen
+  output$tabla_resumen <- renderDT({
+    validate(
+      need(nrow(datos_filtrados()) > 0, "No hay datos disponibles con los filtros seleccionados")
+    )
+    
+    datos_filtrados() %>%
+      select(País, Continente, PIB_per_cápita, Esperanza_de_vida, Población) %>%
+      arrange(desc(PIB_per_cápita)) %>%
+      datatable(options = list(pageLength = 5, scrollX = TRUE))
+  })
+  
+  # Gráfico: Ranking PIB
+  output$plot_ranking_gdp <- renderPlotly({
+    validate(
+      need(nrow(datos_filtrados()) > 0, "No hay datos disponibles con los filtros seleccionados")
+    )
+    
+    top_paises <- datos_filtrados() %>%
+      arrange(desc(PIB_per_cápita)) %>%
+      head(input$top_n)
+    
+    ggplotly(
+      ggplot(top_paises, aes(x = reorder(País, PIB_per_cápita), y = PIB_per_cápita, 
+                             fill = Continente, text = paste("PIB:", round(PIB_per_cápita)))) +
+        geom_col() +
+        coord_flip() +
+        labs(title = paste("Top", input$top_n, "países por PIB per cápita"),
+             x = "", y = "PIB per cápita") +
+        theme_minimal(),
+      tooltip = c("text", "y")
+    )
+  })
+  
+  # Gráfico: Ranking Esperanza de vida
+  output$plot_ranking_life <- renderPlotly({
+    validate(
+      need(nrow(datos_filtrados()) > 0, "No hay datos disponibles con los filtros seleccionados")
+    )
+    
+    top_paises <- datos_filtrados() %>%
+      arrange(desc(Esperanza_de_vida)) %>%
+      head(input$top_n)
+    
+    ggplotly(
+      ggplot(top_paises, aes(x = reorder(País, Esperanza_de_vida), y = Esperanza_de_vida, 
+                             fill = Continente, text = paste("Años:", round(Esperanza_de_vida, 1)))) +
+        geom_col() +
+        coord_flip() +
+        labs(title = paste("Top", input$top_n, "países por Esperanza de Vida"),
+             x = "", y = "Esperanza de Vida (años)") +
+        theme_minimal(),
+      tooltip = c("text", "y")
+    )
+  })
+  
+  # Gráfico: Evolución PIB
+  output$plot_evolucion_gdp <- renderPlotly({
+    validate(
+      need(nrow(datos_evolucion()) > 0, "No hay datos disponibles con los filtros seleccionados")
+    )
+    
+    ggplotly(
+      ggplot(datos_evolucion(), aes(x = Año, y = PIB_per_cápita, 
+                                    color = País, group = País)) +
+        geom_line() +
+        geom_point() +
+        labs(title = "Evolución del PIB per cápita",
+             x = "Año", y = "PIB per cápita") +
+        theme_minimal()
+    )
+  })
+  
+  # Gráfico: Evolución Esperanza de vida
+  output$plot_evolucion_life <- renderPlotly({
+    validate(
+      need(nrow(datos_evolucion()) > 0, "No hay datos disponibles con los filtros seleccionados")
+    )
+    
+    ggplotly(
+      ggplot(datos_evolucion(), aes(x = Año, y = Esperanza_de_vida, 
+                                    color = País, group = País)) +
+        geom_line() +
+        geom_point() +
+        labs(title = "Evolución de la Esperanza de Vida",
+             x = "Año", y = "Esperanza de Vida (años)") +
+        theme_minimal()
+    )
+  })
+  
+  # Gráfico: Comparación por continente
+  output$plot_comparacion <- renderPlotly({
+    validate(
+      need(nrow(datos_evolucion()) > 0, "No hay datos disponibles con los filtros seleccionados")
+    )
+    
+    datos_agrupados <- datos_evolucion() %>%
+      group_by(Continente, Año) %>%
+      summarise(
+        PIB_promedio = mean(PIB_per_cápita),
+        Esperanza_promedio = mean(Esperanza_de_vida),
+        .groups = "drop"
+      )
+    
+    ggplotly(
+      ggplot(datos_agrupados, aes(x = PIB_promedio, y = Esperanza_promedio, 
+                                  color = Continente, frame = Año)) +
+        geom_point(aes(size = Esperanza_promedio), alpha = 0.7) +
+        scale_x_log10() +
+        labs(title = "Comparación entre Continentes",
+             x = "PIB per cápita promedio (log)", 
+             y = "Esperanza de Vida promedio") +
+        theme_minimal()
+    )
+  })
+  
+  # Gráfico: Animación
+  output$plot_animacion <- renderPlotly({
+    validate(
+      need(nrow(datos_evolucion()) > 0, "No hay datos disponibles con los filtros seleccionados"),
+      need(length(unique(datos_evolucion()$Año)) > 1, "Se necesitan múltiples años para la animación")
+    )
+    
+    p <- ggplot(datos_evolucion(), 
+                aes(x = PIB_per_cápita, y = Esperanza_de_vida, 
+                    size = Población, color = Continente,
+                    frame = Año, ids = País, text = País)) +
+      geom_point(alpha = 0.7) +
+      scale_x_log10() +
+      scale_size(range = c(3, 15)) +
+      labs(title = "Desarrollo Económico a través del tiempo",
+           x = "PIB per cápita (log)", 
+           y = "Esperanza de Vida") +
+      theme_minimal()
+    
+    ggplotly(p, tooltip = c("text", "x", "y")) %>%
+      animation_opts(frame = 1000, transition = 500, redraw = FALSE) %>%
+      animation_slider(currentvalue = list(prefix = "Año: "))
+  })
+}
+
+# 5. EJECUCIÓN DE LA APLICACIÓN ---------------------------
+shinyApp(ui, server)
