@@ -97,7 +97,6 @@ A continuación se describen las variables utilizadas en este trabajo:
 
 Se ejecuta la aplicación Shiny con la función shinyApp(ui, server).
 
-https://github.com/user-attachments/assets/ad495a80-27ee-41f0-a58e-8e4a3936feec
 
 **8. Ventajas del Script-Dashboard**
 
@@ -164,3 +163,5 @@ Para este trabajo, trabajamos en conjunto el siguiente equipo, conformado por:
 Este dashboard se encuentra registrado en la aplicacion *Shiny.io*, se puede visualizar en el siguiente link:
 
 *https://joe7gu.shinyapps.io/PACCONTINENTAL/*
+
+https://github.com/user-attachments/assets/ad495a80-27ee-41f0-a58e-8e4a3936feec
